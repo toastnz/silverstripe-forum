@@ -1,5 +1,5 @@
 {
-	"name": "silverstripe/forum",
+	"name": "toastnz/forum",
 	"description": "Forum module for SilverStripe.",
 	"type": "silverstripe-module",
 	"keywords": ["silverstripe", "forum"],
