@@ -1,5 +1,9 @@
 <?php
 
+use SilverStripe\ORM\DataObject;
+use SilverStripe\Forms\FieldList;
+use SilverStripe\Forms\TextField;
+
 /**
  * A Forum Category is applied to each forum page in a has one relation.
  *
@@ -19,11 +23,11 @@ class ForumCategory extends DataObject
     );
     
     private static $has_one = array(
-        'ForumHolder' => 'ForumHolder'
+        'ForumHolder' => ForumHolder::class
     );
     
     private static $has_many = array(
-        'Forums' => 'Forum'
+        'Forums' => Forum::class
     );
         
     private static $default_sort = "\"StackableOrder\" DESC";

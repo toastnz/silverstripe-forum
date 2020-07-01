@@ -1,5 +1,53 @@
 <?php
 
+
+use SilverStripe\ORM\DB;
+use SilverStripe\Dev\Debug;
+use SilverStripe\Forms\Form;
+use SilverStripe\Core\Convert;
+use SilverStripe\ORM\ArrayList;
+use SilverStripe\ORM\DataQuery;
+use SilverStripe\ORM\DataObject;
+use SilverStripe\Security\Group;
+use SilverStripe\Control\Session;
+use SilverStripe\Forms\FieldList;
+use SilverStripe\Forms\FileField;
+use SilverStripe\Forms\TextField;
+use SilverStripe\Security\Member;
+use SilverStripe\Forms\FormAction;
+use SilverStripe\Forms\HeaderField;
+use SilverStripe\Forms\HiddenField;
+use SilverStripe\ORM\PaginatedList;
+use SilverStripe\Security\Security;
+use SilverStripe\View\Requirements;
+use SilverStripe\Control\Controller;
+use SilverStripe\Core\Config\Config;
+use SilverStripe\Forms\LiteralField;
+use SilverStripe\Control\HTTPRequest;
+use SilverStripe\Control\RSS\RSSFeed;
+use SilverStripe\Forms\CheckboxField;
+use SilverStripe\Forms\DropdownField;
+use SilverStripe\Forms\ReadonlyField;
+use SilverStripe\Forms\TextareaField;
+use SilverStripe\Security\Permission;
+use SilverStripe\Forms\OptionsetField;
+use SilverStripe\Forms\RequiredFields;
+use SilverStripe\ORM\FieldType\DBField;
+use SilverStripe\ORM\Queries\SQLSelect;
+use SilverStripe\Core\Injector\Injector;
+use SilverStripe\Security\SecurityToken;
+use SilverStripe\Forms\GridField\GridField;
+use SilverStripe\Forms\TreeMultiselectField;
+use SilverStripe\Forms\GridField\GridFieldConfig;
+use SilverStripe\Forms\GridField\GridFieldButtonRow;
+use SilverStripe\Forms\GridField\GridFieldPageCount;
+use SilverStripe\Forms\GridField\GridFieldPaginator;
+use SilverStripe\Forms\GridField\GridFieldDataColumns;
+use SilverStripe\Forms\GridField\GridFieldDeleteAction;
+use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
+use SilverStripe\Forms\GridField\GridFieldSortableHeader;
+use SilverStripe\Forms\GridField\GridFieldAddExistingAutocompleter;
+
 /**
  * Forum represents a collection of forum threads. Each thread is a different topic on
  * the site. You can customize permissions on a per forum basis in the CMS.
@@ -29,13 +77,13 @@ class Forum extends Page
     );
 
     private static $has_one = array(
-        "Moderator" => "Member",
-        "Category" => "ForumCategory"
+        "Moderator" => Member::class,
+        "Category" => ForumCategory::class
     );
 
     private static $many_many = array(
-        'Moderators' => 'Member',
-        'PosterGroups' => 'Group'
+        'Moderators' => Member::class,
+        'PosterGroups' => Group::class
     );
 
     private static $defaults = array(
@@ -156,19 +204,19 @@ class Forum extends Page
         return $this->CanAttachFiles ? true : false;
     }
 
-    public function requireTable()
-    {
-        // Migrate permission columns
-        if (DB::getConn()->hasTable('Forum')) {
-            $fields = DB::getConn()->fieldList('Forum');
-            if (in_array('ForumPosters', array_keys($fields)) && !in_array('CanPostType', array_keys($fields))) {
-                DB::getConn()->renameField('Forum', 'ForumPosters', 'CanPostType');
-                DB::alteration_message('Migrated forum permissions from "ForumPosters" to "CanPostType"', "created");
-            }
-        }
+    // public function requireTable()
+    // {
+    //     // Migrate permission columns
+    //     if (DB::get_conn()->hasTable('Forum')) {
+    //         $fields = DB::get_conn()->fieldList('Forum');
+    //         if (in_array('ForumPosters', array_keys($fields)) && !in_array('CanPostType', array_keys($fields))) {
+    //             DB::get_conn()->renameField('Forum', 'ForumPosters', 'CanPostType');
+    //             DB::alteration_message('Migrated forum permissions from "ForumPosters" to "CanPostType"', "created");
+    //         }
+    //     }
 
-        parent::requireTable();
-    }
+    //     parent::requireTable();
+    // }
 
     /**
      * Add default records to database
@@ -244,8 +292,8 @@ class Forum extends Page
         $self = $this;
 
         $this->beforeUpdateCMSFields(function ($fields) use ($self) {
-            Requirements::javascript("forum/javascript/ForumAccess.js");
-            Requirements::css("forum/css/Forum_CMS.css");
+            // Requirements::javascript("forum/javascript/ForumAccess.js");
+            // Requirements::css("forum/css/Forum_CMS.css");
 
             $fields->addFieldToTab("Root.Access", new HeaderField(_t('Forum.ACCESSPOST', 'Who can post to the forum?'), 2));
             $fields->addFieldToTab("Root.Access", $optionSetField = new OptionsetField("CanPostType", "", array(
@@ -325,7 +373,7 @@ class Forum extends Page
      *                         displayed
      * @return string HTML code to display breadcrumbs
      */
-    public function Breadcrumbs($maxDepth = null, $unlinked = false, $stopAtPageType = false, $showHidden = false)
+    public function Breadcrumbs($maxDepth = null, $unlinked = false, $stopAtPageType = false, $showHidden = false, $delimiter = '&raquo;')
     {
         $page = $this;
         $nonPageParts = array();
@@ -394,7 +442,7 @@ class Forum extends Page
      */
     public function getNumTopics()
     {
-        $sqlQuery = new SQLQuery();
+        $sqlQuery = new SQLSelect();
         $sqlQuery->setFrom('"Post"');
         $sqlQuery->setSelect('COUNT(DISTINCT("ThreadID"))');
         $sqlQuery->addInnerJoin('Member', '"Post"."AuthorID" = "Member"."ID"');
@@ -410,7 +458,7 @@ class Forum extends Page
      */
     public function getNumPosts()
     {
-        $sqlQuery = new SQLQuery();
+        $sqlQuery = new SQLSelect();
         $sqlQuery->setFrom('"Post"');
         $sqlQuery->setSelect('COUNT("Post"."ID")');
         $sqlQuery->addInnerJoin('Member', '"Post"."AuthorID" = "Member"."ID"');
@@ -427,7 +475,7 @@ class Forum extends Page
      */
     public function getNumAuthors()
     {
-        $sqlQuery = new SQLQuery();
+        $sqlQuery = new SQLSelect();
         $sqlQuery->setFrom('"Post"');
         $sqlQuery->setSelect('COUNT(DISTINCT("AuthorID"))');
         $sqlQuery->addInnerJoin('Member', '"Post"."AuthorID" = "Member"."ID"');
@@ -461,9 +509,10 @@ class Forum extends Page
         // Get a list of forum threads inside this forum that aren't sticky
         $threads = ForumThread::get()->filter(array(
             'ForumID' => $this->ID,
-            'IsGlobalSticky' => 0,
-            'IsSticky' => 0
+            // 'IsGlobalSticky' => 0,
+            // 'IsSticky' => 0
         ));
+        
 
         // Get the underlying query and change it to inner join on the posts list to just show threads that
         // have approved (and maybe awaiting) posts, and sort the threads by the most recent post
@@ -475,10 +524,13 @@ class Forum extends Page
             ->setDistinct(false);
 
         // Alter the forum threads list to use the new query
-        $threads = $threads->setDataQuery(new Forum_DataQuery('ForumThread', $threadQuery));
+        // $threads = $threads->setDataQuery(new Forum_DataQuery('ForumThread', $threadQuery));
 
         // And return the results
-        return $threads->exists() ? new PaginatedList($threads, $_GET) : null;
+        if($threads->count()){
+            return $threads->exists() ? new PaginatedList($threads, $_GET) : null;
+        }
+        
     }
 
 
@@ -513,7 +565,8 @@ class Forum extends Page
 
        // Build result as ArrayList
         $res = new ArrayList();
-        $rows = $query->execute();
+        // $rows = $query->execute();
+        $rows = [];
         if ($rows) {
             foreach ($rows as $row) {
                 $res->push(new ForumThread($row));
@@ -529,7 +582,7 @@ class Forum extends Page
  *
  * @package forum
  */
-class Forum_Controller extends Page_Controller
+class Forum_Controller extends PageController
 {
 
     private static $allowed_actions = array(
@@ -557,11 +610,11 @@ class Forum_Controller extends Page_Controller
             return;
         }
 
-        Requirements::javascript(THIRDPARTY_DIR . "/jquery/jquery.js");
-        Requirements::javascript("forum/javascript/Forum.js");
-        Requirements::javascript("forum/javascript/jquery.MultiFile.js");
+        // Requirements::javascript(THIRDPARTY_DIR . "/jquery/jquery.js");
+        // Requirements::javascript("forum/javascript/Forum.js");
+        // Requirements::javascript("forum/javascript/jquery.MultiFile.js");
 
-        Requirements::themedCSS('Forum', 'forum', 'all');
+        // Requirements::themedCSS('Forum', 'forum', 'all');
 
         RSSFeed::linkToFeed($this->Parent()->Link("rss/forum/$this->ID"), sprintf(_t('Forum.RSSFORUM', "Posts to the '%s' forum"), $this->Title));
         RSSFeed::linkToFeed($this->Parent()->Link("rss"), _t('Forum.RSSFORUMS', 'Posts to all forums'));
@@ -584,11 +637,12 @@ class Forum_Controller extends Page_Controller
             $member->write();
         }
 
+        $request = Injector::inst()->get(HTTPRequest::class);
         // Set the back url
         if (isset($_SERVER['REQUEST_URI'])) {
-            Session::set('BackURL', $_SERVER['REQUEST_URI']);
+            $request->getSession()->set('BackURL', $_SERVER['REQUEST_URI']);
         } else {
-            Session::set('BackURL', $this->Link());
+            $request->getSession()->set('BackURL', $this->Link());
         }
     }
 
@@ -899,18 +953,20 @@ class Forum_Controller extends Page_Controller
             return false;
         }
 
-        $forumBBCodeHint = $this->renderWith('Forum_BBCodeHint');
+        // $forumBBCodeHint = $this->renderWith('Forum_BBCodeHint');
 
         $fields = new FieldList(
-            ($post && $post->isFirstPost() || !$thread) ? new TextField("Title", _t('Forum.FORUMTHREADTITLE', 'Title')) : new ReadonlyField('Title', _t('Forum.FORUMTHREADTITLE', ''), 'Re:'. $thread->Title),
-            new TextareaField("Content", _t('Forum.FORUMREPLYCONTENT', 'Content')),
-            new LiteralField(
-                "BBCodeHelper",
-                "<div class=\"BBCodeHint\">[ <a href=\"#BBTagsHolder\" id=\"BBCodeHint\">" .
-                _t('Forum.BBCODEHINT', 'View Formatting Help') .
-                "</a> ]</div>" .
-                $forumBBCodeHint
-            ),
+            ($post && $post->isFirstPost() || !$thread) ? 
+                new TextField("Title", _t('Forum', 'Title')) 
+            : new ReadonlyField('Title', _t('Forum', 'Title'), 'Re:'. $thread->Title),
+            new TextareaField("Content", _t('Forum', 'Content')),
+            // new LiteralField(
+            //     "BBCodeHelper",
+            //     "<div class=\"BBCodeHint\">[ <a href=\"#BBTagsHolder\" id=\"BBCodeHint\">" .
+            //     _t('Forum.BBCODEHINT', 'View Formatting Help') .
+            //     "</a> ]</div>" .
+            //     $forumBBCodeHint
+            // ),
             new CheckboxField(
                 "TopicSubscription",
                 _t('Forum.SUBSCRIBETOPIC', 'Subscribe to this topic (Receive email notifications when a new reply is added)'),
@@ -1084,7 +1140,7 @@ class Forum_Controller extends Page_Controller
                         $message .= implode(', ', Config::inst()->get('File', 'allowed_extensions'));
                         $form->addErrorMessage('Attachment', $message, 'bad');
 
-                        Session::set("FormInfo.Form_PostMessageForm.data", $data);
+                        $request->getSession()->set("FormInfo.Form_PostMessageForm.data", $data);
 
                         return $this->redirectBack();
                     }
@@ -1408,8 +1464,10 @@ class Forum_Controller extends Page_Controller
      */
     public function ForumAdminMsg()
     {
-        $message = Session::get('ForumAdminMsg');
-        Session::clear('ForumAdminMsg');
+        $request = Injector::inst()->get(HTTPRequest::class);
+        $session = $request->getSession();
+        $message = $session->get('ForumAdminMsg');
+        $session->clear('ForumAdminMsg');
 
         return $message;
     }

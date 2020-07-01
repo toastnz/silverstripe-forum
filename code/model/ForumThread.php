@@ -1,5 +1,16 @@
 <?php
 
+use SilverStripe\ORM\DB;
+use SilverStripe\Core\Convert;
+use SilverStripe\ORM\DataObject;
+use SilverStripe\Security\Member;
+use SilverStripe\Control\Director;
+use SilverStripe\Control\Email\Email;
+use SilverStripe\Control\HTTPRequest;
+use SilverStripe\ORM\FieldType\DBField;
+use SilverStripe\ORM\Queries\SQLSelect;
+use SilverStripe\Core\Injector\Injector;
+
 /**
  * A representation of a forum thread. A forum thread is 1 topic on the forum
  * which has multiple posts underneath it.
@@ -19,11 +30,11 @@ class ForumThread extends DataObject
     );
 
     private static $has_one = array(
-        'Forum' => 'Forum'
+        'Forum' => Forum::class
     );
 
     private static $has_many = array(
-        'Posts' => 'Post'
+        'Posts' => Post::class
     );
 
     private static $defaults = array(
@@ -46,7 +57,7 @@ class ForumThread extends DataObject
     /**
      * Check if the user can create new threads and add responses
      */
-    public function canPost($member = null)
+    public function canPost($member = null, $context = [])
     {
         if (!$member) {
             $member = Member::currentUser();
@@ -57,7 +68,7 @@ class ForumThread extends DataObject
     /**
      * Check if user can moderate this thread
      */
-    public function canModerate($member = null)
+    public function canModerate($member = null, $context = [])
     {
         if (!$member) {
             $member = Member::currentUser();
@@ -68,7 +79,7 @@ class ForumThread extends DataObject
     /**
      * Check if user can view the thread
      */
-    public function canView($member = null)
+    public function canView($member = null, $context = [])
     {
         if (!$member) {
             $member = Member::currentUser();
@@ -79,7 +90,7 @@ class ForumThread extends DataObject
     /**
      * Hook up into moderation.
      */
-    public function canEdit($member = null)
+    public function canEdit($member = null, $context = [])
     {
         if (!$member) {
             $member = Member::currentUser();
@@ -91,7 +102,7 @@ class ForumThread extends DataObject
      * Hook up into moderation - users cannot delete their own posts/threads because
      * we will loose history this way.
      */
-    public function canDelete($member = null)
+    public function canDelete($member = null, $context = [])
     {
         if (!$member) {
             $member = Member::currentUser();
@@ -102,7 +113,7 @@ class ForumThread extends DataObject
     /**
      * Hook up into canPost check
      */
-    public function canCreate($member = null)
+    public function canCreate($member = null, $context = [])
     {
         if (!$member) {
             $member = Member::currentUser();
@@ -156,7 +167,7 @@ class ForumThread extends DataObject
      */
     public function getNumPosts()
     {
-        $sqlQuery = new SQLQuery();
+        $sqlQuery = new SQLSelect();
         $sqlQuery->setFrom('"Post"');
         $sqlQuery->setSelect('COUNT("Post"."ID")');
         $sqlQuery->addInnerJoin('Member', '"Post"."AuthorID" = "Member"."ID"');
@@ -173,11 +184,13 @@ class ForumThread extends DataObject
      */
     public function incNumViews()
     {
-        if (Session::get('ForumViewed-' . $this->ID)) {
+        $request = Injector::inst()->get(HTTPRequest::class);
+        $session = $request->getSession();
+        if ($session->get('ForumViewed-' . $this->ID)) {
             return false;
         }
 
-        Session::set('ForumViewed-' . $this->ID, 'true');
+        $session->set('ForumViewed-' . $this->ID, 'true');
 
         $this->NumViews++;
         $SQL_numViews = Convert::raw2sql($this->NumViews);
@@ -264,7 +277,7 @@ class ForumThread_Subscription extends DataObject
 {
 
     private static $db = array(
-        "LastSent" => "SS_Datetime"
+        "LastSent" => "Datetime"
     );
 
     private static $has_one = array(

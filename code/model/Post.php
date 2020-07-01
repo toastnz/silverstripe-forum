@@ -1,5 +1,15 @@
 <?php
 
+use SilverStripe\ORM\DB;
+use SilverStripe\Assets\File;
+use SilverStripe\Core\Convert;
+use SilverStripe\ORM\DataObject;
+use SilverStripe\Security\Member;
+use SilverStripe\Control\Director;
+use SilverStripe\Control\Controller;
+use SilverStripe\Security\Permission;
+use SilverStripe\Security\SecurityToken;
+
 /**
  * Forum Post Object. Contains a single post by the user. A thread is generated
  * with multiple posts.
@@ -16,20 +26,20 @@ class Post extends DataObject
     );
 
     private static $casting = array(
-        "Updated" => "SS_Datetime",
+        "Updated" => "Datetime",
         "RSSContent" => "HTMLText",
         "RSSAuthor" => "Varchar",
         "Content" => "HTMLText"
     );
 
     private static $has_one = array(
-        "Author" => "Member",
-        "Thread" => "ForumThread",
-        "Forum" => "Forum" // denormalized data but used for read speed
+        "Author" => Member::class,
+        "Thread" => ForumThread::class,
+        "Forum" => Forum::class // denormalized data but used for read speed
     );
 
     private static $has_many = array(
-        "Attachments" => "Post_Attachment"
+        "Attachments" => Post_Attachment::class
     );
 
     private static $summary_fields = array(
@@ -77,7 +87,7 @@ class Post extends DataObject
     /**
      * Check if user can see the post
      */
-    public function canView($member = null)
+    public function canView($member = null, $context = [])
     {
         if (!$member) {
             $member = Member::currentUser();
@@ -95,7 +105,7 @@ class Post extends DataObject
     /**
      * Check if user can edit the post (only if it's his own, or he's an admin user)
      */
-    public function canEdit($member = null)
+    public function canEdit($member = null, $context = [])
     {
         if (!$member) {
             $member = Member::currentUser();
@@ -120,7 +130,7 @@ class Post extends DataObject
      * Follow edit permissions for this, but additionally allow moderation even
      * if the thread is marked as readonly.
      */
-    public function canDelete($member = null)
+    public function canDelete($member = null, $context = [])
     {
         if (!$member) {
             $member = Member::currentUser();
@@ -135,7 +145,7 @@ class Post extends DataObject
     /**
      * Check if user can add new posts - hook up into canPost.
      */
-    public function canCreate($member = null)
+    public function canCreate($member = null, $context = [])
     {
         if (!$member) {
             $member = Member::currentUser();
@@ -241,6 +251,13 @@ class Post extends DataObject
         $url = $this->Link('reply');
 
         return '<a href="' . $url . '" class="replyLink">' . _t('Post.REPLYLINK', 'Post Reply') . '</a>';
+    }
+    
+    public function ReplyLinkURL()
+    {
+        $url = $this->Link('reply');
+
+        return $url;
     }
 
     /**

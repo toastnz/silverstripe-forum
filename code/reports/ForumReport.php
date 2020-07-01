@@ -1,4 +1,7 @@
 <?php
+
+use SilverStripe\Reports\Report;
+use SilverStripe\ORM\Queries\SQLSelect;
 /**
  * Forum Reports.
  * These are some basic reporting tools which sit in the CMS for the user to view.
@@ -12,7 +15,7 @@
  * Lists the Number of people who have signed up in the past months categorized
  * by month.
  */
-class ForumReport_MemberSignups extends SS_Report
+class ForumReport_MemberSignups extends Report
 {
 
     public function title()
@@ -22,10 +25,10 @@ class ForumReport_MemberSignups extends SS_Report
 
     public function sourceRecords($params = array())
     {
-        $membersQuery = new SQLQuery();
+        $membersQuery = new SQLSelect();
         $membersQuery->setFrom('"Member"');
         $membersQuery->setSelect(array(
-            'Month' => DB::getConn()->formattedDatetimeClause('"Created"', '%Y-%m'),
+            'Month' => DB::get_conn()->formattedDatetimeClause('"Created"', '%Y-%m'),
             'Signups' => 'COUNT("Created")'
         ));
         $membersQuery->setGroupBy('"Month"');
@@ -61,7 +64,7 @@ class ForumReport_MemberSignups extends SS_Report
  * Lists the Number of Posts made in the forums in the past months categorized
  * by month.
  */
-class ForumReport_MonthlyPosts extends SS_Report
+class ForumReport_MonthlyPosts extends Report
 {
 
     public function title()
@@ -71,10 +74,10 @@ class ForumReport_MonthlyPosts extends SS_Report
 
     public function sourceRecords($params = array())
     {
-        $postsQuery = new SQLQuery();
+        $postsQuery = new SQLSelect();
         $postsQuery->setFrom('"Post"');
         $postsQuery->setSelect(array(
-            'Month' => DB::getConn()->formattedDatetimeClause('"Created"', '%Y-%m'),
+            'Month' => DB::get_conn()->formattedDatetimeClause('"Created"', '%Y-%m'),
             'Posts' => 'COUNT("Created")'
         ));
         $postsQuery->setGroupBy('"Month"');

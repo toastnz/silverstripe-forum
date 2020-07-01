@@ -1,5 +1,42 @@
 <?php
 
+use SilverStripe\ORM\DB;
+use SilverStripe\Core\Convert;
+use SilverStripe\ORM\ArrayList;
+use SilverStripe\ORM\DataObject;
+use SilverStripe\Security\Group;
+use SilverStripe\Dev\Deprecation;
+use SilverStripe\Forms\TextField;
+use SilverStripe\Security\Member;
+use SilverStripe\Dev\SapphireTest;
+use SilverStripe\Forms\HeaderField;
+use SilverStripe\ORM\PaginatedList;
+use SilverStripe\View\Requirements;
+use SilverStripe\Control\Controller;
+use SilverStripe\Forms\LiteralField;
+use SilverStripe\Control\HTTPRequest;
+use SilverStripe\Control\RSS\RSSFeed;
+use SilverStripe\Forms\CheckboxField;
+use SilverStripe\Forms\DropdownField;
+use SilverStripe\Versioned\Versioned;
+use SilverStripe\Forms\OptionsetField;
+use SilverStripe\ORM\FieldType\DBField;
+use SilverStripe\ORM\Queries\SQLSelect;
+use SilverStripe\Core\Injector\Injector;
+use SilverStripe\Security\Authenticator;
+use SilverStripe\Forms\GridField\GridField;
+use SilverStripe\Forms\GridField\GridFieldConfig;
+use SilverStripe\Forms\HTMLEditor\HTMLEditorField;
+use SilverStripe\Forms\GridField\GridFieldButtonRow;
+use SilverStripe\Forms\GridField\GridFieldPaginator;
+use SilverStripe\Forms\GridField\GridFieldDetailForm;
+use SilverStripe\Forms\GridField\GridFieldEditButton;
+use SilverStripe\Forms\GridField\GridFieldViewButton;
+use SilverStripe\Forms\GridField\GridFieldDataColumns;
+use SilverStripe\Forms\GridField\GridFieldAddNewButton;
+use SilverStripe\Forms\GridField\GridFieldDeleteAction;
+use SilverStripe\Forms\GridField\GridFieldSortableHeader;
+
 /**
  * ForumHolder represents the top forum overview page. Its children
  * should be Forums. On this page you can also edit your global settings
@@ -35,7 +72,7 @@ class ForumHolder extends Page
     private static $has_one = array();
 
     private static $has_many = array(
-        "Categories" => "ForumCategory"
+        "Categories" => ForumCategory::class
     );
 
     private static $allowed_children = array('Forum');
@@ -223,7 +260,7 @@ class ForumHolder extends Page
      * a breadcrumb to get back to the ForumHolder page.
      * @return string
      */
-    public function Breadcrumbs($maxDepth = 20, $unlinked = false, $stopAtPageType = false, $showHidden = false)
+    public function Breadcrumbs($maxDepth = 20, $unlinked = false, $stopAtPageType = false, $showHidden = false, $delimiter = '&raquo;')
     {
         if (isset($this->urlParams['Action'])) {
             switch ($this->urlParams['Action']) {
@@ -245,7 +282,7 @@ class ForumHolder extends Page
      */
     public function getNumPosts()
     {
-            $sqlQuery = new SQLQuery();
+            $sqlQuery = new SQLSelect();
             $sqlQuery->setFrom('"Post"');
             $sqlQuery->setSelect('COUNT("Post"."ID")');
             $sqlQuery->addInnerJoin('Member', '"Post"."AuthorID" = "Member"."ID"');
@@ -263,7 +300,7 @@ class ForumHolder extends Page
      */
     public function getNumTopics()
     {
-        $sqlQuery = new SQLQuery();
+        $sqlQuery = new SQLSelect();
         $sqlQuery->setFrom('"Post"');
         $sqlQuery->setSelect('COUNT(DISTINCT("ThreadID"))');
         $sqlQuery->addInnerJoin('Member', '"Post"."AuthorID" = "Member"."ID"');
@@ -281,7 +318,7 @@ class ForumHolder extends Page
      */
     public function getNumAuthors()
     {
-        $sqlQuery = new SQLQuery();
+        $sqlQuery = new SQLSelect();
         $sqlQuery->setFrom('"Post"');
         $sqlQuery->setSelect('COUNT(DISTINCT("AuthorID"))');
         $sqlQuery->addInnerJoin('Member', '"Post"."AuthorID" = "Member"."ID"');
@@ -325,7 +362,7 @@ class ForumHolder extends Page
         return Member::get()
             ->leftJoin('Group_Members', '"Member"."ID" = "Group_Members"."MemberID"')
             ->filter('GroupID', $groupIDs)
-            ->where('"Member"."LastViewed" > ' . DB::getConn()->datetimeIntervalClause('NOW', '-15 MINUTE'))
+            ->where('"Member"."LastViewed" > ' . DB::get_conn()->datetimeIntervalClause('NOW', '-15 MINUTE'))
             ->sort('"Member"."FirstName", "Member"."Surname"');
     }
 
@@ -441,9 +478,9 @@ class ForumHolder extends Page
     static function baseForumTable()
     {
         $stage = (Controller::curr()->getRequest()) ? Controller::curr()->getRequest()->getVar('stage') : false;
-        if (!$stage) {
-            $stage = Versioned::get_live_stage();
-        }
+        // if (!$stage) {
+        //     $stage = Versioned::LIVE();
+        // }
 
         if ((class_exists('SapphireTest', false) && SapphireTest::is_running_test())
             || $stage == "Stage"
@@ -621,7 +658,7 @@ class ForumHolder extends Page
 }
 
 
-class ForumHolder_Controller extends Page_Controller
+class ForumHolderController extends PageController
 {
 
     private static $allowed_actions = array(
@@ -636,19 +673,20 @@ class ForumHolder_Controller extends Page_Controller
     {
         parent::init();
 
-        Requirements::javascript(THIRDPARTY_DIR . "/jquery/jquery.js");
-        Requirements::javascript("forum/javascript/jquery.MultiFile.js");
-        Requirements::javascript("forum/javascript/forum.js");
+        // Requirements::javascript(THIRDPARTY_DIR . "/jquery/jquery.js");
+        // Requirements::javascript("forum/javascript/jquery.MultiFile.js");
+        // Requirements::javascript("forum/javascript/forum.js");
 
-        Requirements::themedCSS('Forum', 'forum', 'all');
+        // Requirements::themedCSS('Forum', 'forum', 'all');
 
         RSSFeed::linkToFeed($this->Link("rss"), _t('ForumHolder.POSTSTOALLFORUMS', "Posts to all forums"));
-
+        $request = Injector::inst()->get(HTTPRequest::class);
+        $session = $request->getSession();
         // Set the back url
         if (isset($_SERVER['REQUEST_URI'])) {
-            Session::set('BackURL', $_SERVER['REQUEST_URI']);
+            $session->set('BackURL', $_SERVER['REQUEST_URI']);
         } else {
-            Session::set('BackURL', $this->Link());
+            $session->set('BackURL', $this->Link());
         }
     }
 
@@ -776,9 +814,11 @@ class ForumHolder_Controller extends Page_Controller
      */
     public function login()
     {
-        Session::set('Security.Message.message', _t('Forum.CREDENTIALS'));
-        Session::set('Security.Message.type', 'status');
-        Session::set("BackURL", $this->Link());
+        $request = Injector::inst()->get(HTTPRequest::class);
+        $session = $request->getSession();
+        $session->set('Security.Message.message', _t('Forum.CREDENTIALS'));
+        $session->set('Security.Message.type', 'status');
+        $session->set("BackURL", $this->Link());
 
         $this->redirect('Security/login');
     }

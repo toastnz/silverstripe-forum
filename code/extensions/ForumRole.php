@@ -1,4 +1,22 @@
 <?php
+
+use SilverStripe\ORM\DB;
+use SilverStripe\Assets\Image;
+use SilverStripe\ORM\DataQuery;
+use SilverStripe\Core\Extension;
+use SilverStripe\Forms\FieldList;
+use SilverStripe\Forms\FileField;
+use SilverStripe\Security\Member;
+use SilverStripe\Forms\HeaderField;
+use SilverStripe\ORM\DataExtension;
+use SilverStripe\Core\Config\Config;
+use SilverStripe\Forms\LiteralField;
+use SilverStripe\Forms\ReadonlyField;
+use SilverStripe\Security\Permission;
+use SilverStripe\Forms\CompositeField;
+use SilverStripe\Forms\RequiredFields;
+use SilverStripe\ORM\Queries\SQLSelect;
+use SilverStripe\Forms\ConfirmedPasswordField;
 /**
  * ForumRole
  *
@@ -13,7 +31,7 @@ class ForumRole extends DataExtension
     /**
      * Edit the given query object to support queries for this extension
      */
-    public function augmentSQL(SQLQuery &$query)
+    public function augmentSQL(SQLSelect $query = null, DataQuery $dataQuery = null)
     {
     }
 
@@ -23,7 +41,7 @@ class ForumRole extends DataExtension
      */
     public function augmentDatabase()
     {
-        $exist = DB::tableList();
+        // $exist = DB::tableList();
         if (!empty($exist) && array_search('ForumMember', $exist) !== false) {
             DB::query("UPDATE \"Member\", \"ForumMember\" " .
                 "SET \"Member\".\"ClassName\" = 'Member'," .
@@ -57,7 +75,7 @@ class ForumRole extends DataExtension
         'CityPublic' => 'Boolean',
         'CountryPublic' => 'Boolean',
         'EmailPublic' => 'Boolean',
-        'LastViewed' => 'SS_Datetime',
+        'LastViewed' => 'Datetime',
         'Signature' => 'Text',
         'ForumStatus' => 'Enum("Normal, Banned, Ghost", "Normal")',
         'SuspendedUntil' => 'Date'
@@ -291,7 +309,7 @@ class ForumRole extends DataExtension
     public function IsSuspended()
     {
         if ($this->owner->SuspendedUntil) {
-            return strtotime(SS_Datetime::now()->Format('Y-m-d')) < strtotime($this->owner->SuspendedUntil);
+            return strtotime(Datetime::now()->Format('Y-m-d')) < strtotime($this->owner->SuspendedUntil);
         } else {
             return false;
         }

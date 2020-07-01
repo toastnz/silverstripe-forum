@@ -1,10 +1,13 @@
 <?php
+
+use SilverStripe\Control\HTTPRequest;
+use SilverStripe\Core\Injector\Injector;
 /**
  * ForumMemberProfile is the profile pages for a given ForumMember
  *
  * @package forum
  */
-class ForumMemberProfile extends Page_Controller
+class ForumMemberProfile extends PageController
 {
 
     private static $allowed_actions = array(
@@ -110,7 +113,11 @@ class ForumMemberProfile extends Page_Controller
      */
     function RegistrationForm()
     {
-        $data = Session::get("FormInfo.Form_RegistrationForm.data");
+    
+        $request = Injector::inst()->get(HTTPRequest::class);
+        $session = $request->getSession();
+        
+        $data = $session->get("FormInfo.Form_RegistrationForm.data");
 
         $use_openid =
             ($this->getForumHolder()->OpenIDAvailable() == true) &&
@@ -175,7 +182,8 @@ class ForumMemberProfile extends Page_Controller
      */
     function doregister($data, $form)
     {
-
+        $request = Injector::inst()->get(HTTPRequest::class);
+        $session = $request->getSession();
         // Check if the honeypot has been filled out
         if (ForumHolder::$use_honeypot_on_register) {
             if (@$data['username']) {
