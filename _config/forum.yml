@@ -1,17 +1,15 @@
 ---
 Name: forum
 ---
-Director:
+SilverStripe\Control\Director:
   rules:
-    'ForumMemberProfile//$Action/$ID/$OtherID': 'ForumMemberProfile'
-Member:
+    "ForumMemberProfile//$Action/$ID/$OtherID": "ForumMemberProfile"
+SilverStripe\Security\Member:
   extensions:
-    ForumRole:
-      ForumRole
+    ForumRole: ForumRole
 Member_Validator:
   extensions:
-    ForumRole_Validator:
-      ForumRole_Validator
+    ForumRole_Validator: ForumRole_Validator
 Post:
   extensions:
     - ForumSpamPostExtension
