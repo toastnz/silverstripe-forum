@@ -23,6 +23,7 @@ use SilverStripe\View\Requirements;
 use SilverStripe\Control\Controller;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Forms\LiteralField;
+use SilverStripe\Control\Email\Email;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\RSS\RSSFeed;
 use SilverStripe\Forms\CheckboxField;
@@ -971,6 +972,10 @@ class Forum_Controller extends PageController
                 "TopicSubscription",
                 _t('Forum.SUBSCRIBETOPIC', 'Subscribe to this topic (Receive email notifications when a new reply is added)'),
                 ($thread) ? $thread->getHasSubscribed() : false
+            ),
+            new CheckboxField(
+                "SendTopic",
+                _t('Forum.SENDTOPIC','Send an Email to all Forum Members about this topic'),
             )
         );
 
@@ -1185,6 +1190,44 @@ class Forum_Controller extends PageController
             // See if the member wanted to remove themselves
             DB::query("DELETE FROM \"ForumThread_Subscription\" WHERE \"ThreadID\" = '$post->ThreadID' AND \"MemberID\" = '$member->ID'");
         }
+        
+        if(!empty($data['SendTopic'])) {
+			//get forum members
+			$members = DataObject::get('Member');
+			foreach($members as $member){
+				$test_grp = 7;
+				$forum_grp = 4;
+				if($member->inGroup($forum_grp)){
+					$from = 'noreply@homeplus.co.nz';
+					$to = $member->Email;
+					$subject = 'New Topic "'. $data['Title'] .'" has been added to Homeplus Forum';
+					$topic = $data['Title'];
+					$content = $data['Content'];
+					$link = 'dashboard/';
+					$attachments = $post->Attachments();
+					// Start the email class
+					$email = new Homeplus_Forum();
+					// Set the values
+					$email->setFrom($from);
+					$email->setTo($to);
+					$email->setSubject($subject);
+					$email->populateTemplate(
+						array(
+							'Topic' => $topic,
+							'Content' => $content,
+							'Link' => $link,
+							'Attachments' => $attachments
+						)
+					);
+					
+					// Send the email
+					$email->send();
+					
+				}else{
+				
+				}	
+			}
+		}
 
         // Send any notifications that need to be sent
         ForumThread_Subscription::notify($post);
@@ -1551,4 +1594,9 @@ class Forum_DataQuery extends DataQuery
         parent::__construct($dataClass);
         $this->query = $query;
     }
+}
+
+class Homeplus_Forum extends Email 
+{
+	protected $ss_template = 'Homeplus_Forum';
 }

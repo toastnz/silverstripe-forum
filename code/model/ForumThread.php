@@ -23,6 +23,7 @@ class ForumThread extends DataObject
 
     private static $db = array(
         "Title" => "Varchar(255)",
+        "Content" => "Text",
         "NumViews" => "Int",
         "IsSticky" => "Boolean",
         "IsReadOnly" => "Boolean",
